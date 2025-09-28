@@ -6,8 +6,6 @@ import json
 import os
 from datetime import datetime
 
-# --- FUNÇÕES GLOBAIS CORRIGIDAS ---
-
 
 def desenhar_quadrado_contorno(img):
     """
@@ -20,7 +18,7 @@ def desenhar_quadrado_contorno(img):
     COR_CONTORNO = (255, 255, 255)  # Branco
 
     if largura < TAMANHO_QUADRADO or altura < TAMANHO_QUADRADO:
-        return [0, 0, 0, 0]  # Limites inválidos
+        return [0, 0, 0, 0]
 
     centro_x = largura // 2
     centro_y = altura // 2
@@ -30,7 +28,6 @@ def desenhar_quadrado_contorno(img):
     x2 = centro_x + (TAMANHO_QUADRADO // 2)
     y2 = centro_y + (TAMANHO_QUADRADO // 2)
 
-    # Desenha apenas o contorno
     cv2.rectangle(img, (x1, y1), (x2, y2), COR_CONTORNO, ESPESSURA_CONTORNO)
 
     return [x1, y1, x2, y2]
@@ -43,33 +40,25 @@ def calcular_similaridade_mascara(mascara_alvo, mascara_desenho, limite_minimo=0
 
     :param mascara_alvo: Máscara binária (255) do quadrado alvo.
     :param mascara_desenho: Máscara binária (255) da linha desenhada pelo jogador.
+    :param limite_minimo: Hiperparâmetro que define o limite mínimo para se ganhar o jogo.
     """
 
-    # Verifica se há algo desenhado ou se a máscara alvo não é apenas preta
     if np.sum(mascara_desenho) == 0:
         return 0.0, False
 
-    # 1. Interseção: Onde o desenho e o alvo se sobrepõem
-    # Usamos cv2.bitwise_and para encontrar a área de coincidência
+    # Área de acerto = máscara de intersecção entre o desenho e a forma plotada
     mascara_intersecao = cv2.bitwise_and(mascara_desenho, mascara_alvo)
 
-    # 2. Contagem de pixels:
-    # A área que coincide (pixels brancos na intersecção)
-    pixels_intersecao = (
-        np.sum(mascara_intersecao) / 255
-    )  # Divide por 255 para contar pixels, não o valor
+    pixels_intersecao = np.sum(mascara_intersecao) / 255
 
-    # A área total que o jogador desenhou (pixels brancos no desenho)
     pixels_desenho_total = np.sum(mascara_desenho) / 255
 
     if pixels_desenho_total == 0:
         return 0.0, False
 
-    # A similaridade é a Intersecção / Desenho Total
-    # Se for 1.0 (100%), significa que cada ponto desenhado coincidiu com o contorno alvo.
+    # Similaridade = razão entre os pixels da área de acerto e os pixels do desenho do jogador
     similaridade = pixels_intersecao / pixels_desenho_total
 
-    # Verifica se atingiu o limite
     atingiu_limite = similaridade >= limite_minimo
 
     return similaridade, atingiu_limite
@@ -139,7 +128,6 @@ class LousaDigital:
         self.botoes = self.botoes_cores + self.botoes_ferramentas
 
     def smooth_drawing(self, current_pos):
-        # ... (Mantido igual)
         if self.last_position is None:
             self.last_position = current_pos
             return [current_pos]
@@ -163,7 +151,6 @@ class LousaDigital:
         return points
 
     def salvar_desenho(self):
-        # ... (Mantido igual)
         if not self.desenho:
             return
 
@@ -185,7 +172,6 @@ class LousaDigital:
             print(f"Erro ao salvar: {e}")
 
     def carregar_desenho(self):
-        # ... (Mantido igual)
         arquivos = [
             f
             for f in os.listdir(".")
@@ -211,7 +197,6 @@ class LousaDigital:
             print(f"Erro ao carregar: {e}")
 
     def desfazer_ultimo(self):
-        # ... (Mantido igual)
         if not self.desenho:
             return
 
@@ -239,16 +224,13 @@ class LousaDigital:
                     self.espessura = max(self.espessura - 5, 5)
                 elif texto == "Limpar":
                     self.desenho = []
-                    self.imgCanvas = np.zeros(
-                        (self.altura, self.largura, 3), np.uint8
-                    )  # Limpa Máscara
+                    self.imgCanvas = np.zeros((self.altura, self.largura, 3), np.uint8)
                 elif texto == "Salvar":
                     self.salvar_desenho()
                 elif texto == "Carregar":
                     self.carregar_desenho()
                 elif texto == "Desfazer":
                     self.desfazer_ultimo()
-                    # Reconstruir Máscara seria complexo, melhor limpar no jogo
                     if self.jogo_ativo:
                         self.desenho = []
                         self.imgCanvas = np.zeros(
@@ -257,14 +239,11 @@ class LousaDigital:
                 elif texto == "Iniciar Jogo":
                     self.jogo_ativo = not self.jogo_ativo
                     self.desenho = []
-                    self.imgCanvas = np.zeros(
-                        (self.altura, self.largura, 3), np.uint8
-                    )  # Limpa Máscara
+                    self.imgCanvas = np.zeros((self.altura, self.largura, 3), np.uint8)
                     print(f"Jogo: {'ATIVO' if self.jogo_ativo else 'INATIVO'}")
                 break
 
     def desenhar_interface(self, img):
-        # ... (Mantido igual)
         # Botões de cores
         for bx1, by1, bx2, by2, bcor, texto in self.botoes_cores:
             if texto in self.cores and self.cores[texto] == self.cor:
@@ -352,7 +331,6 @@ class LousaDigital:
         # Cria uma cópia temporária do canvas para não modificar o original
         if draw_on_canvas:
             self.imgCanvas = np.zeros((self.altura, self.largura, 3), np.uint8)
-            # Garantir que a linha desenhada no canvas seja sempre BRANCA para a máscara (255, 255, 255)
             cor_canvas = (255, 255, 255)
 
         for id, ponto in enumerate(self.desenho):
@@ -383,7 +361,6 @@ class LousaDigital:
             if not check:
                 break
 
-            # Garantindo a largura e altura
             self.altura, self.largura, _ = img.shape
 
             # Reduz cooldown
@@ -411,7 +388,6 @@ class LousaDigital:
                 if dedosLev == 1:
                     pontos_suavizados = self.smooth_drawing((x, y))
                     for px, py in pontos_suavizados:
-                        # Guarda a cor ATUAL, mesmo que no jogo usemos branco para a máscara
                         self.desenho.append((px, py, self.cor, self.espessura))
                     cv2.circle(img, (x, y), self.espessura // 2, self.cor, 2)
 
@@ -422,12 +398,9 @@ class LousaDigital:
 
                 elif dedosLev == 3:
                     self.desenho = []
-                    self.imgCanvas = np.zeros(
-                        (self.altura, self.largura, 3), np.uint8
-                    )  # Limpa Máscara
+                    self.imgCanvas = np.zeros((self.altura, self.largura, 3), np.uint8)
                     self.last_position = None
 
-            # --- LÓGICA DO JOGO/SIMILARIDADE ---
             limites_forma = [0, 0, 0, 0]
             similaridade_texto_display = None
 
@@ -437,7 +410,6 @@ class LousaDigital:
 
                 # 2. Cria a MÁSCARA ALVO para o cálculo
                 mascara_alvo_bgr = np.zeros((self.altura, self.largura, 3), np.uint8)
-                # O contorno alvo é desenhado em BRANCO (255, 255, 255) na máscara
                 x1, y1, x2, y2 = limites_forma
                 margem_erro = self.espessura + 5
                 cv2.rectangle(
@@ -447,10 +419,8 @@ class LousaDigital:
                 mascara_alvo = cv2.cvtColor(mascara_alvo_bgr, cv2.COLOR_BGR2GRAY)
 
                 # 3. Desenha a linha do jogador na imgCanvas (Máscara Desenho)
-                # Isso cria self.imgCanvas com o desenho do jogador em BRANCO
                 self.renderizar_desenho(img, draw_on_canvas=True)
 
-                # A MÁSCARA DE DESENHO é o canal de luminância da imgCanvas
                 mascara_desenho = cv2.cvtColor(self.imgCanvas, cv2.COLOR_BGR2GRAY)
 
                 # 4. Calcula e ARMAZENA O TEXTO apenas quando o desenho estiver finalizado
@@ -459,7 +429,6 @@ class LousaDigital:
                     and len(self.desenho) > 0
                     and self.last_position is None
                 ):
-                    # Cálculo da nova similaridade por máscara
                     similaridade, similar = calcular_similaridade_mascara(
                         mascara_alvo, mascara_desenho, limite_minimo=0.75
                     )
@@ -470,17 +439,15 @@ class LousaDigital:
                         "cor": cor_texto,
                     }
 
-            # Renderiza desenho (SEMPRE POR CIMA do contorno)
-            # Desta vez, renderizamos usando as cores armazenadas em self.desenho
+            # Renderiza desenho
             self.renderizar_desenho(img, draw_on_canvas=False)
 
-            # Espelha imagem
             img = cv2.flip(img, 1)
 
             # Desenha interface (Botões e texto de informações)
             self.desenhar_interface(img)
 
-            # --- DESENHA O TEXTO DE SIMILARIDADE DEPOIS DE ESPELHAR ---
+            # Desenha o texto do jogo de simlaridade (se tivesse sido plotado antes, ia ficar espelhado)
             if similaridade_texto_display:
                 cv2.putText(
                     img,
