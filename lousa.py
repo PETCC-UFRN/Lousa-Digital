@@ -4,7 +4,13 @@ import mediapipe as mp
 import numpy as np
 import json
 import os
-from jogo_similaridade import desenhar_quadrado_contorno, calcular_similaridade
+import time
+from jogo_similaridade import (
+    desenhar_quadrado_contorno,
+    calcular_similaridade,
+    salvar_pontuacao,
+    carrega_ranking,
+)
 from datetime import datetime
 
 
@@ -31,6 +37,9 @@ class LousaDigital:
         self.button_cooldown = 0
         self.last_position = None
         self.jogo_ativo = False
+        self.salvar_pontuacao_ativo = False
+        self.similaridade = 0
+        self.mostrar_ranking = False
 
         # Cores disponíveis
         self.cores = {
@@ -65,11 +74,18 @@ class LousaDigital:
             [40, 300, 130, 340, (128, 128, 128), "+"],
             [40, 350, 130, 390, (128, 128, 128), "-"],
             [40, 400, 130, 440, (128, 128, 128), "Desfazer"],
-            [20, 450, 150, 490, (0, 200, 0), "Iniciar Jogo"],
+            [780, 20, 920, 60, (0, 200, 0), "Iniciar Jogo"],
+            [930, 20, 1060, 60, (0, 200, 0), "Ver ranking"],
+        ]
+
+        self.botao_salvar_pontuacao = [
+            [1000, 500, 1200, 550, (20, 150, 20), "Salvar Pontuacao?"]
         ]
 
         # Combinando todos os botões
-        self.botoes = self.botoes_cores + self.botoes_ferramentas
+        self.botoes = (
+            self.botoes_cores + self.botoes_ferramentas + self.botao_salvar_pontuacao
+        )
 
     def smooth_drawing(self, current_pos):
         if self.last_position is None:
@@ -185,6 +201,16 @@ class LousaDigital:
                     self.desenho = []
                     self.imgCanvas = np.zeros((self.altura, self.largura, 3), np.uint8)
                     print(f"Jogo: {'ATIVO' if self.jogo_ativo else 'INATIVO'}")
+                elif texto == "Salvar Pontuacao?":
+                    salvar_pontuacao(self.similaridade)
+                    print("Pontuacao salva!")
+                    self.salvar_pontuacao_ativo = not self.salvar_pontuacao_ativo
+                    self.desenho = []
+                    self.imgCanvas = np.zeros((self.altura, self.largura, 3), np.uint8)
+                    if self.jogo_ativo:
+                        self.jogo_ativo = not self.jogo_ativo
+                elif texto == "Ver ranking":
+                    self.mostrar_ranking = not self.mostrar_ranking
                 break
 
     def desenhar_interface(self, img):
@@ -222,6 +248,22 @@ class LousaDigital:
             if texto == "Iniciar Jogo" and self.jogo_ativo:
                 cv2.rectangle(img, (bx1, by1), (bx2, by2), (0, 255, 0), 4)
 
+            text_size = cv2.getTextSize(texto, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+            text_x = bx1 + (bx2 - bx1 - text_size[0]) // 2
+            text_y = by1 + (by2 - by1 + text_size[1]) // 2
+            cv2.putText(
+                img,
+                texto,
+                (text_x, text_y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 255),
+                2,
+            )
+        if self.salvar_pontuacao_ativo:
+            for bx1, by1, bx2, by2, bcor, texto in self.botao_salvar_pontuacao:
+                cv2.rectangle(img, (bx1, by1), (bx2, by2), bcor, cv2.FILLED)
+                cv2.rectangle(img, (bx1, by1), (bx2, by2), (50, 50, 50), 2)
             text_size = cv2.getTextSize(texto, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
             text_x = bx1 + (bx2 - bx1 - text_size[0]) // 2
             text_y = by1 + (by2 - by1 + text_size[1]) // 2
@@ -299,6 +341,8 @@ class LousaDigital:
         """Loop principal da aplicação"""
 
         similaridade_texto_display = None
+        x_jogo_inicio = None
+        y_jogo_inicio = None
 
         while True:
             check, img = self.video.read()
@@ -334,6 +378,15 @@ class LousaDigital:
                     for px, py in pontos_suavizados:
                         self.desenho.append((px, py, self.cor, self.espessura))
                     cv2.circle(img, (x, y), self.espessura // 2, self.cor, 2)
+                    if (
+                        self.jogo_ativo
+                        and x_jogo_inicio is None
+                        and y_jogo_inicio is None
+                    ):
+                        x_jogo_inicio, y_jogo_inicio = self.last_position
+                        momento_jogo_inicio = time.time()
+                        print(x_jogo_inicio)
+                        print(y_jogo_inicio)
 
                 elif dedosLev != 1 and dedosLev != 3:
                     if self.desenho and self.desenho[-1][0] != 0:
@@ -346,7 +399,6 @@ class LousaDigital:
                     self.last_position = None
 
             limites_forma = [0, 0, 0, 0]
-            similaridade_texto_display = None
 
             # 1. Desenha o Contorno ALVO (na imagem real, para visualização)
             if self.jogo_ativo:
@@ -369,19 +421,23 @@ class LousaDigital:
 
                 # 4. Calcula e ARMAZENA O TEXTO apenas quando o desenho estiver finalizado
                 if (
-                    dedosLev == 2
+                    x_jogo_inicio is not None
+                    and y_jogo_inicio is not None
+                    and x_jogo_inicio - 20 <= x <= x_jogo_inicio + 20
+                    and y_jogo_inicio - 20 <= y <= y_jogo_inicio + 20
+                    and time.time() > momento_jogo_inicio + 3
                     and len(self.desenho) > 0
-                    and self.last_position is None
                 ):
-                    similaridade, similar = calcular_similaridade(
+                    self.similaridade, similar = calcular_similaridade(
                         mascara_alvo, mascara_desenho, limite_minimo=0.75
                     )
                     cor_texto = (0, 255, 0) if similar else (0, 0, 255)
 
                     similaridade_texto_display = {
-                        "texto": f"Similaridade: {similaridade*100:.2f}% ({'OK' if similar else 'TENTE NOVAMENTE'})",
+                        "texto": f"Similaridade: {self.similaridade*100:.2f}% ({'OK' if similar else 'TENTE NOVAMENTE'})",
                         "cor": cor_texto,
                     }
+                    self.salvar_pontuacao_ativo = True
 
             # Renderiza desenho
             self.renderizar_desenho(img, draw_on_canvas=False)
@@ -390,6 +446,92 @@ class LousaDigital:
 
             # Desenha interface (Botões e texto de informações)
             self.desenhar_interface(img)
+
+            if self.mostrar_ranking:
+                # 1. Carrega o ranking
+                ranking = carrega_ranking()
+
+                # 2. Cria a sobreposição (mesmo tamanho da imagem, totalmente preta)
+                overlay = img.copy()
+
+                # 3. Desenha um retângulo semi-transparente no centro (por exemplo, 80% da tela)
+                w_o = int(self.largura * 0.8)
+                h_o = int(self.altura * 0.8)
+                x_o = int((self.largura - w_o) / 2)
+                y_o = int((self.altura - h_o) / 2)
+
+                cv2.rectangle(
+                    overlay, (x_o, y_o), (x_o + w_o, y_o + h_o), (0, 0, 0), cv2.FILLED
+                )
+
+                # Mescla a sobreposição preta com a imagem original (alfa=0.7 para transparência)
+                img = cv2.addWeighted(overlay, 0.7, img, 0.3, 0)
+
+                # 4. Desenha o título e instruções
+                center_x = self.largura // 2
+
+                # Título
+                title_text = "RANKING DE SIMILARIDADE"
+                (tw, th) = cv2.getTextSize(title_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 3)[
+                    0
+                ]
+                cv2.putText(
+                    img,
+                    title_text,
+                    (center_x - tw // 2, y_o + 60),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (255, 255, 0),
+                    3,
+                )
+                # Instrução de saída
+                inst_text = "Use '3 dedos' ou pressione 'r' para voltar."
+                (iw, ih) = cv2.getTextSize(inst_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)[
+                    0
+                ]
+                cv2.putText(
+                    img,
+                    inst_text,
+                    (center_x - iw // 2, self.altura - 50),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (200, 200, 200),
+                    1,
+                )
+
+                # 5. Exibir as pontuações
+                y_pos = y_o + 120
+                if ranking:
+                    # Exibe apenas os 10 melhores
+                    top_ranking = ranking[:10]
+                    for i, pontuacao in enumerate(top_ranking):
+                        texto_ranking = f"#{i+1}: {pontuacao*100:.2f}%"
+                        cor_ranking = (255, 255, 255)
+
+                        # Centraliza o texto do ranking na largura do retângulo
+                        (rw, rh) = cv2.getTextSize(
+                            texto_ranking, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
+                        )[0]
+                        cv2.putText(
+                            img,
+                            texto_ranking,
+                            (center_x - rw // 2, y_pos),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            cor_ranking,
+                            2,
+                        )
+                        y_pos += 40
+                else:
+                    cv2.putText(
+                        img,
+                        "Nenhuma pontuação encontrada.",
+                        (center_x - 150, y_pos),  # Posição centralizada aproximada
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 0, 255),
+                        2,
+                    )
 
             # Desenha o texto do jogo de simlaridade (se tivesse sido plotado antes, ia ficar espelhado)
             if similaridade_texto_display:
