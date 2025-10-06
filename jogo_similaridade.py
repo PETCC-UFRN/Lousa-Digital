@@ -1,5 +1,8 @@
 import cv2
 import numpy as np
+import tkinter as tk
+from collections import OrderedDict
+import numpy as np
 
 
 def desenhar_quadrado_contorno(img):
@@ -59,26 +62,67 @@ def calcular_similaridade(mascara_alvo, mascara_desenho, limite_minimo=0.75):
     return similaridade, atingiu_limite
 
 
-def salvar_pontuacao(similaridade):
+def salvar_nome_jogador():
+    def submit():
+        nonlocal entered_text
+        entered_text = entry.get()
+        root.destroy()
+
+    entered_text = None
+    root = tk.Tk()
+    root.title("Salvar pontuação")
+
+    tk.Label(root, text="Insira o nome do jogador:").pack()
+    entry = tk.Entry(root, width=40)
+    entry.pack()
+    tk.Button(root, text="Salvar", command=submit).pack()
+
+    root.mainloop()
+    return entered_text
+
+
+def salvar_pontuacao(nome_jogador, pontuacao):
     filename = "ranking.txt"
     ranking = carrega_ranking()
-    ranking.append(similaridade)
-    ranking = sorted(ranking, reverse=True)
+    if nome_jogador in ranking:
+        if pontuacao > ranking[nome_jogador]:
+            ranking[nome_jogador] = pontuacao
+    else:
+        ranking[nome_jogador] = pontuacao
+    ranking_ordenado = dict(
+        sorted(ranking.items(), key=lambda item: item[1], reverse=True)
+    )
+
     try:
         with open(filename, "w") as f:
-            for item in ranking:
-                f.write(f"{item}\n")
+            for jogador, score in ranking_ordenado.items():
+                f.write(f"{jogador}:={score:.4f}\n")
     except Exception as e:
         print(f"Erro ao salvar a pontuação: {e}")
 
 
 def carrega_ranking():
     filename = "ranking.txt"
-    ranking = []
+    ranking = {}
     try:
         with open(filename, "r") as f:
             for line in f:
-                ranking.append(float(line.strip()))
+                if ":=" in line:
+                    nome_jogador = line[: line.find(":=")].strip()
+                    pontuacao_str = line[line.find(":=") + 2 :].strip()
+
+                    try:
+                        pontuacao_float = float(pontuacao_str)
+                        ranking[nome_jogador] = pontuacao_float
+                    except ValueError:
+                        continue
+    except FileNotFoundError:
+        pass
     except Exception as e:
-        print(f"Erro ao cerregar o ranking: {e}")
-    return ranking
+        print(f"Erro ao carregar o ranking: {e}")
+
+    ranking_ordenado = dict(
+        sorted(ranking.items(), key=lambda item: item[1], reverse=True)
+    )
+
+    return ranking_ordenado

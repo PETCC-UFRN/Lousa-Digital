@@ -8,6 +8,7 @@ import time
 from jogo_similaridade import (
     desenhar_quadrado_contorno,
     calcular_similaridade,
+    salvar_nome_jogador,
     salvar_pontuacao,
     carrega_ranking,
 )
@@ -202,7 +203,8 @@ class LousaDigital:
                     self.imgCanvas = np.zeros((self.altura, self.largura, 3), np.uint8)
                     print(f"Jogo: {'ATIVO' if self.jogo_ativo else 'INATIVO'}")
                 elif texto == "Salvar Pontuacao?":
-                    salvar_pontuacao(self.similaridade)
+                    nome_jogador = salvar_nome_jogador()
+                    salvar_pontuacao(nome_jogador, self.similaridade)
                     print("Pontuacao salva!")
                     self.salvar_pontuacao_ativo = not self.salvar_pontuacao_ativo
                     self.desenho = []
@@ -470,7 +472,7 @@ class LousaDigital:
                 center_x = self.largura // 2
 
                 # Título
-                title_text = "RANKING DE SIMILARIDADE"
+                title_text = "RANKING DE PONTUACAO"
                 (tw, th) = cv2.getTextSize(title_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 3)[
                     0
                 ]
@@ -502,9 +504,9 @@ class LousaDigital:
                 y_pos = y_o + 120
                 if ranking:
                     # Exibe apenas os 10 melhores
-                    top_ranking = ranking[:10]
-                    for i, pontuacao in enumerate(top_ranking):
-                        texto_ranking = f"#{i+1}: {pontuacao*100:.2f}%"
+                    top_ranking = {k: ranking[k] for k in list(ranking)[:10]}
+                    for jogador, pontuacao in top_ranking.items():
+                        texto_ranking = f"Jogador: {jogador}: {pontuacao*100:.2f}%"
                         cor_ranking = (255, 255, 255)
 
                         # Centraliza o texto do ranking na largura do retângulo
