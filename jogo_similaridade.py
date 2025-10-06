@@ -57,3 +57,28 @@ def calcular_similaridade(mascara_alvo, mascara_desenho, limite_minimo=0.75):
     atingiu_limite = similaridade >= limite_minimo
 
     return similaridade, atingiu_limite
+
+
+def salvar_pontuacao(similaridade):
+    filename = "ranking.txt"
+    ranking = carrega_ranking()
+    ranking.append(similaridade)
+    ranking = sorted(ranking, reverse=True)
+    try:
+        with open(filename, "w") as f:
+            for item in ranking:
+                f.write(f"{item}\n")
+    except Exception as e:
+        print(f"Erro ao salvar a pontuação: {e}")
+
+
+def carrega_ranking():
+    filename = "ranking.txt"
+    ranking = []
+    try:
+        with open(filename, "r") as f:
+            for line in f:
+                ranking.append(float(line.strip()))
+    except Exception as e:
+        print(f"Erro ao cerregar o ranking: {e}")
+    return ranking
