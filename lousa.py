@@ -461,11 +461,10 @@ class LousaDigital:
                 y_o = int((self.altura - h_o) / 2)
 
                 cv2.rectangle(
-                    overlay, (x_o, y_o), (x_o + w_o, y_o + h_o), (0, 0, 0), cv2.FILLED
+                    overlay, (x_o, y_o), (x_o + w_o, y_o + h_o), (0, 150, 0), cv2.FILLED
                 )
-
                 # Mescla a sobreposição preta com a imagem original (alfa=0.7 para transparência)
-                img = cv2.addWeighted(overlay, 0.7, img, 0.3, 0)
+                img = cv2.addWeighted(overlay, 0.8, img, 0.3, 0)
 
                 # 4. Desenha o título e instruções
                 center_x = self.largura // 2
@@ -481,7 +480,7 @@ class LousaDigital:
                     (center_x - tw // 2, y_o + 60),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
-                    (255, 255, 0),
+                    (255, 255, 255),
                     3,
                 )
                 # Instrução de saída
